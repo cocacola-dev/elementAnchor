@@ -40,6 +40,12 @@ Select an element in the **Elements** panel and Element Anchor captures a clean,
 | `extractor.js` | Injected into the page to extract HTML/CSS/JS |
 | `icons/` | Extension icons |
 
+## License
+
+[MIT](LICENSE) © 2026 cocacola-dev — free to use, modify, and distribute for personal **and** commercial projects.
+
+> Note: the source code is MIT. The anchor icon is Twemoji, licensed separately under CC-BY 4.0 (see Credits below).
+
 ## Credits
 
 The anchor icon is adapted (resized) from **Twemoji**:
