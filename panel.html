@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    /* ---------- Dark palette (default) ---------- */
+    :root {
+      --bg: #0f141b;
+      --bg-2: #131a24;
+      --surface: #1a2230;
+      --surface-2: #202b3a;
+      --border: #283445;
+      --border-strong: #3a4a5e;
+      --text: #dfe6ee;
+      --text-muted: #8695a9;
+      --accent: #2f81c9;
+      --accent-2: #4aa3e8;
+      --accent-ink: #ffffff;
+      --accent-glow: rgba(47, 129, 201, 0.35);
+      --code-bg: #0b1017;
+      --success: #4ec9b0;
+      --danger: #e06c75;
+      --html: #e2a86b;
+      --css: #56b6f0;
+      --js: #e5c07b;
+      --shadow: rgba(0, 0, 0, 0.4);
+    }
+
+    /* ---------- Light palette (matches DevTools light theme) ---------- */
+    body.theme-light {
+      --bg: #f5f7fa;
+      --bg-2: #eef1f5;
+      --surface: #ffffff;
+      --surface-2: #f1f4f8;
+      --border: #dde3ea;
+      --border-strong: #c4cdda;
+      --text: #1f2733;
+      --text-muted: #647084;
+      --accent: #1f6fb2;
+      --accent-2: #2f81c9;
+      --accent-ink: #ffffff;
+      --accent-glow: rgba(31, 111, 178, 0.22);
+      --code-bg: #f7f9fc;
+      --success: #1a9d84;
+      --danger: #cc4b53;
+      --html: #b5651d;
+      --css: #1f6fb2;
+      --js: #97761a;
+      --shadow: rgba(20, 30, 45, 0.12);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 12px;
+      color: var(--text);
+      background:
+        radial-gradient(120% 60% at 50% -10%, var(--accent-glow) 0%, transparent 60%),
+        var(--bg);
+      padding: 10px;
+      overflow-y: auto;
+    }
+
+    /* ---------- Header / brand ---------- */
+    .app-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 2px 12px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .brand-icon {
+      width: 26px;
+      height: 26px;
+      filter: drop-shadow(0 1px 4px var(--accent-glow));
+    }
+    .brand-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+    .brand-sub {
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+    }
+
+    /* ---------- Toolbar ---------- */
+    .toolbar {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    button {
+      font-family: inherit;
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+      transition: background 0.12s, border-color 0.12s, transform 0.08s, box-shadow 0.12s;
+    }
+    button:hover { background: var(--surface-2); border-color: var(--border-strong); }
+    button:active { transform: translateY(1px); }
+
+    button.primary {
+      background: linear-gradient(180deg, var(--accent-2), var(--accent));
+      color: var(--accent-ink);
+      border-color: transparent;
+      box-shadow: 0 1px 8px var(--accent-glow);
+    }
+    button.primary:hover { filter: brightness(1.08); }
+
+    button.toggle.active {
+      background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+      border-color: var(--accent);
+      color: var(--accent-2);
+    }
+
+    /* ---------- Option chips ---------- */
+    .options {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+      cursor: pointer;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px 10px;
+      user-select: none;
+      transition: border-color 0.12s, color 0.12s, background 0.12s;
+    }
+    .chip:hover { border-color: var(--border-strong); }
+    .chip:has(input:checked) {
+      color: var(--text);
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+    }
+    .chip input[type="checkbox"] { accent-color: var(--accent); margin: 0; }
+
+    /* ---------- Meta row (element info + status) ---------- */
+    #element-info {
+      font-size: 11px;
+      color: var(--text);
+      margin-bottom: 6px;
+      padding: 6px 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 5px;
+      font-family: "Cascadia Code", "Consolas", monospace;
+      word-break: break-all;
+    }
+    #element-info.flash { animation: flash 0.5s ease-out; }
+    @keyframes flash {
+      0% { border-left-color: var(--accent-2); background: color-mix(in srgb, var(--accent) 24%, var(--surface)); }
+      100% { border-left-color: var(--accent); background: var(--surface); }
+    }
+
+    .status {
+      font-size: 11px;
+      color: var(--text-muted);
+      padding: 3px 2px 8px;
+      min-height: 20px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status::before {
+      content: "";
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      flex: none;
+    }
+    .status.success { color: var(--success); }
+    .status.success::before { background: var(--success); box-shadow: 0 0 6px var(--success); }
+    .status.error { color: var(--danger); }
+    .status.error::before { background: var(--danger); }
+    .status:empty { display: none; }
+
+    /* ---------- Sections ---------- */
+    .section {
+      margin-bottom: 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--surface);
+      box-shadow: 0 1px 3px var(--shadow);
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--surface);
+      padding: 8px 10px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.12s;
+    }
+    .section-header:hover { background: var(--surface-2); }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .chevron {
+      width: 8px; height: 8px;
+      border-right: 1.5px solid var(--text-muted);
+      border-bottom: 1.5px solid var(--text-muted);
+      transform: rotate(45deg);
+      transition: transform 0.15s;
+      margin-right: 1px;
+    }
+    .section:has(.section-body.collapsed) .chevron { transform: rotate(-45deg); }
+
+    .lang-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex: none;
+    }
+    .section[data-lang="html"] .lang-dot { background: var(--html); box-shadow: 0 0 6px var(--html); }
+    .section[data-lang="css"]  .lang-dot { background: var(--css);  box-shadow: 0 0 6px var(--css); }
+    .section[data-lang="js"]   .lang-dot { background: var(--js);   box-shadow: 0 0 6px var(--js); }
+
+    .tag {
+      font-family: "Cascadia Code", "Consolas", monospace;
+      background: var(--surface-2);
+      color: var(--text-muted);
+      padding: 1px 7px;
+      border-radius: 999px;
+      font-size: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .section-actions { display: flex; gap: 4px; }
+    .section-actions button { font-size: 10px; padding: 3px 9px; }
+
+    .section-body {
+      max-height: 400px;
+      overflow: auto;
+      border-top: 1px solid var(--border);
+    }
+    .section-body.collapsed { display: none; }
+
+    pre {
+      margin: 0;
+      padding: 10px;
+      background: var(--code-bg);
+      color: var(--text);
+      font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+      font-size: 11px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+      tab-size: 2;
+    }
+    pre:empty::after {
+      content: "—";
+      color: var(--text-muted);
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-strong);
+      border-radius: 999px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); background-clip: padding-box; }
+    ::-webkit-scrollbar-track { background: transparent; }
+  </style>
+</head>
+<body>
+  <div class="app-header">
+    <img class="brand-icon" src="icons/icon48.png" alt="">
+    <div class="brand-text">
+      <div class="brand-title">Element Anchor</div>
+      <div class="brand-sub">Capture · HTML · CSS · JS</div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button id="btn-capture" class="primary">&#x2693; Capture</button>
+    <button id="btn-pin" class="toggle">&#x1F4CC; Pin</button>
+    <button id="btn-copy-all">Copy All</button>
+    <button id="btn-export">Export .html</button>
+  </div>
+
+  <div class="options">
+    <label class="chip"><input type="checkbox" id="opt-children" checked> Children</label>
+    <label class="chip"><input type="checkbox" id="opt-pseudo" checked> Pseudo</label>
+    <label class="chip"><input type="checkbox" id="opt-iframes" checked> Iframes</label>
+    <label class="chip"><input type="checkbox" id="opt-computed"> Computed only</label>
+  </div>
+
+  <div id="element-info">Select an element to drop anchor</div>
+  <div id="status" class="status"></div>
+
+  <div class="section" data-lang="html">
+    <div class="section-header" data-target="html-body">
+      <span class="section-title"><span class="chevron"></span><span class="lang-dot"></span>HTML <span class="tag" id="html-size"></span></span>
+      <div class="section-actions">
+        <button data-copy="html-body">Copy</button>
+      </div>
+    </div>
+    <div class="section-body" id="html-body"><pre id="html-code"></pre></div>
+  </div>
+
+  <div class="section" data-lang="css">
+    <div class="section-header" data-target="css-body">
+      <span class="section-title"><span class="chevron"></span><span class="lang-dot"></span>CSS <span class="tag" id="css-size"></span></span>
+      <div class="section-actions">
+        <button data-copy="css-body">Copy</button>
+      </div>
+    </div>
+    <div class="section-body" id="css-body"><pre id="css-code"></pre></div>
+  </div>
+
+  <div class="section" data-lang="js">
+    <div class="section-header" data-target="js-body">
+      <span class="section-title"><span class="chevron"></span><span class="lang-dot"></span>JavaScript <span class="tag" id="js-size"></span></span>
+      <div class="section-actions">
+        <button data-copy="js-body">Copy</button>
+      </div>
+    </div>
+    <div class="section-body" id="js-body"><pre id="js-code"></pre></div>
+  </div>
+
+  <script src="panel.js"></script>
+</body>
+</html>
