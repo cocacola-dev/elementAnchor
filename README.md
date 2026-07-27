@@ -19,7 +19,16 @@ Select an element in the **Elements** panel and Element Anchor captures a clean,
 1. Open `chrome://extensions`.
 2. Enable **Developer mode** (top-right).
 3. Click **Load unpacked** and select this folder.
-4. Open DevTools (`F12`) → **Elements** → the **Element Anchor** pane, then select an element.
+
+## Usage
+
+![Using Element Anchor](docs/usage.jpg)
+
+1. Open **DevTools** (`F12` or `Ctrl+Shift+I`) on any page.
+2. Go to the **Elements** tab and click the element you want to capture.
+3. Open the **Element Anchor** pane on the right (click the `»` overflow arrow if it's hidden).
+4. It captures automatically — the **HTML**, **CSS** and **JavaScript** appear in collapsible sections.
+5. Use **Copy** on any section, **Copy All**, or **Export .html** to save a standalone file. Hit **📌 Pin** to freeze the current capture while you keep browsing the DOM.
 
 ## Files
 
@@ -33,4 +42,8 @@ Select an element in the **Elements** panel and Element Anchor captures a clean,
 
 ## Credits
 
-The anchor icon is from [Twemoji](https://github.com/twitter/twemoji) (Twitter, Inc. and contributors), licensed under **CC-BY 4.0**. See `icons/about.txt`.
+The anchor icon is adapted (resized) from **Twemoji**:
+
+- Graphic: `2693.svg` (⚓ anchor)
+- Author: Copyright 2020 Twitter, Inc. and other contributors — https://github.com/twitter/twemoji
+- License: [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/)
