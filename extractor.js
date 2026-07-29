@@ -11,6 +11,50 @@ function extractElement(options) {
   const collectedJS = [];
   const processedElements = new Set();
 
+  // Lazily-created clean iframe used to read a tag's user-agent default styles,
+  // so computed-mode capture can drop every property that just equals the UA
+  // default. Kept isolated (about:blank has no author CSS) so inherited values
+  // the element actually needs — color, font-family — differ from the neutral
+  // baseline and are preserved. Cached per tag; torn down at the end.
+  const defaultsCache = new Map();
+  let defaultsFrame = null;
+  let defaultsDoc = null;
+  let defaultsWin = null;
+
+  function getDefaultComputed(tagName) {
+    if (defaultsCache.has(tagName)) return defaultsCache.get(tagName);
+    let map = null;
+    try {
+      if (!defaultsFrame) {
+        defaultsFrame = document.createElement("iframe");
+        defaultsFrame.setAttribute("aria-hidden", "true");
+        defaultsFrame.style.cssText =
+          "position:absolute;left:-9999px;top:0;width:0;height:0;border:0;visibility:hidden;";
+        document.body.appendChild(defaultsFrame);
+        defaultsDoc = defaultsFrame.contentDocument;
+        defaultsWin = defaultsFrame.contentWindow;
+      }
+      if (defaultsDoc && defaultsDoc.body) {
+        const probe = defaultsDoc.createElement(tagName);
+        defaultsDoc.body.appendChild(probe);
+        const cs = defaultsWin.getComputedStyle(probe);
+        map = {};
+        for (let i = 0; i < cs.length; i++) {
+          map[cs[i]] = cs.getPropertyValue(cs[i]);
+        }
+        defaultsDoc.body.removeChild(probe);
+      }
+    } catch (_) {
+      map = null; // fall back to no filtering for this tag
+    }
+    defaultsCache.set(tagName, map);
+    return map;
+  }
+
+  // Build a selector RELATIVE to the captured root `el`. The preview/export
+  // only contain el's subtree, so an absolute path anchored at a distant
+  // ancestor (#content > …) would match nothing there — the generated rules
+  // would silently fail to apply. Stopping at el keeps selectors self-contained.
   function selectorFor(element) {
     if (element.id) return "#" + CSS.escape(element.id);
     let path = [];
@@ -18,6 +62,7 @@ function extractElement(options) {
     while (cur && cur.nodeType === 1) {
       let seg = cur.localName;
       if (cur.id) {
+        // An id inside the captured subtree is unique — anchor the path here.
         seg = "#" + CSS.escape(cur.id);
         path.unshift(seg);
         break;
@@ -25,6 +70,12 @@ function extractElement(options) {
       if (cur.className && typeof cur.className === "string") {
         const classes = cur.className.trim().split(/\s+/).slice(0, 2);
         if (classes.length) seg += "." + classes.map(c => CSS.escape(c)).join(".");
+      }
+      // The captured root tops the isolated subtree: it has no siblings in the
+      // preview/export, so drop the positional qualifier and stop climbing.
+      if (cur === el) {
+        path.unshift(seg);
+        break;
       }
       const parent = cur.parentElement;
       if (parent) {
@@ -205,14 +256,19 @@ function extractElement(options) {
 
   function getComputedCSS(element, selector) {
     const computed = window.getComputedStyle(element);
+    const defaults = getDefaultComputed(element.localName);
     const lines = [];
     for (let i = 0; i < computed.length; i++) {
       const prop = computed[i];
+      // Custom properties are already substituted into concrete values in
+      // computed mode, so the token declarations themselves are dead weight.
+      if (prop.startsWith("--")) continue;
       const val = computed.getPropertyValue(prop);
-      const defaults = ["none", "normal", "auto", "0px", "0", "", "rgba(0, 0, 0, 0)", "transparent", "start", "baseline"];
-      if (!defaults.includes(val) && val !== "0px 0px" && val !== "0px 0px 0px 0px") {
-        lines.push("  " + prop + ": " + val + ";");
-      }
+      if (!val) continue;
+      // Drop anything that just matches this tag's user-agent default — that's
+      // the bulk of the noise (ruby-*, mask-*, scroll-timeline-*, -webkit-*…).
+      if (defaults && defaults[prop] === val) continue;
+      lines.push("  " + prop + ": " + val + ";");
     }
     if (lines.length) {
       return selector + " {\n" + lines.join("\n") + "\n}";
@@ -349,6 +405,26 @@ function extractElement(options) {
     collectedCSS.unshift("/* --- inherited variables, @font-face & @keyframes --- */\n" + context);
   }
 
+  // Remove the throwaway defaults iframe we injected for computed-mode filtering.
+  if (defaultsFrame && defaultsFrame.parentNode) {
+    defaultsFrame.parentNode.removeChild(defaultsFrame);
+  }
+
+  // Count stylesheets we couldn't read — cross-origin sheets throw on .cssRules.
+  // In matched-rule mode these are silently skipped, so the panel can use this
+  // to nudge the user toward Computed only (which bypasses the restriction).
+  let blockedSheets = 0;
+  try {
+    const doc = el.ownerDocument || document;
+    for (const sheet of doc.styleSheets) {
+      try {
+        if (!(sheet.cssRules || sheet.rules)) { /* empty, not blocked */ }
+      } catch (_) {
+        blockedSheets++;
+      }
+    }
+  } catch (_) {}
+
   const tag = el.localName;
   const id = el.id ? "#" + el.id : "";
   const cls = el.className && typeof el.className === "string"
@@ -363,5 +439,7 @@ function extractElement(options) {
     // Absolute base of the element's document so relative asset URLs
     // (images, fonts, backgrounds) resolve when rendered in the preview iframe.
     baseURI: (el.ownerDocument || document).baseURI,
+    // How many stylesheets were unreadable (cross-origin) — drives the hint.
+    blockedSheets: blockedSheets,
   };
 }

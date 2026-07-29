@@ -21,6 +21,10 @@
   const animControls = document.getElementById("anim-controls");
   const btnReplay = document.getElementById("btn-replay");
   const optLoop = document.getElementById("opt-loop");
+  const previewNote = document.getElementById("preview-note");
+  const xoriginHint = document.getElementById("xorigin-hint");
+  const btnEnableComputed = document.getElementById("btn-enable-computed");
+  const optComputed = document.getElementById("opt-computed");
 
   const htmlCode = document.getElementById("html-code");
   const cssCode = document.getElementById("css-code");
@@ -198,6 +202,15 @@
     const hasAnimation = /@keyframes/i.test(result.css || "");
     animControls.style.display = hasAnimation ? "inline-flex" : "none";
 
+    // Warn about links only when the capture contains an anchor — clicking one
+    // in the sandbox navigates the frame and can trigger a redirect.
+    previewNote.style.display = /<a[\s>]/i.test(result.html || "") ? "flex" : "none";
+
+    // Nudge toward Computed only when matched-rule mode hit unreadable
+    // cross-origin stylesheets — that's the silent dead end on CDN-styled sites.
+    const crossOrigin = !optComputed.checked && result.blockedSheets > 0;
+    xoriginHint.style.display = crossOrigin ? "flex" : "none";
+
     renderPreview(result);
 
     setStatus("Captured successfully" + (result.frameURL ? " (from iframe)" : ""), true);
@@ -218,6 +231,7 @@
 
     const seq = ++captureSeq;
     setStatus("Capturing...", false);
+    xoriginHint.style.display = "none"; // clear any stale hint before re-checking
 
     const frameURL = await findFrameWithSelection();
     if (seq !== captureSeq) return; // a newer capture superseded this one
@@ -263,6 +277,14 @@
   // needed since we already hold the HTML/CSS/JS.
   optRunJS.addEventListener("change", () => renderPreview(lastResult));
 
+  // The cross-origin hint's action: switch to Computed only and re-capture,
+  // which reads styles via getComputedStyle and sidesteps the restriction.
+  btnEnableComputed.addEventListener("click", () => {
+    optComputed.checked = true;
+    xoriginHint.style.display = "none";
+    capture();
+  });
+
   // Replay re-renders the iframe from scratch — a fresh document restarts every
   // load-driven CSS animation, which is the only way to retrigger them without
   // reaching into the sandboxed frame's DOM.
@@ -273,11 +295,14 @@
   optLoop.addEventListener("change", () => renderPreview(lastResult));
 
   // Cycle the preview backdrop so light-on-light / dark-on-dark elements stay
-  // visible. Pure CSS via data-bg — no re-render needed.
+  // visible. Pure CSS via data-bg — no re-render needed. The glyph fills to
+  // match the current backdrop (half / hollow / solid) as a live indicator.
   const BG_MODES = ["checker", "light", "dark"];
+  const BG_GLYPH = { checker: "◐", light: "○", dark: "●" };
   btnBg.addEventListener("click", () => {
     const next = BG_MODES[(BG_MODES.indexOf(previewStage.dataset.bg) + 1) % BG_MODES.length];
     previewStage.dataset.bg = next;
+    btnBg.textContent = BG_GLYPH[next];
     btnBg.title = "Preview background: " + next;
   });
 

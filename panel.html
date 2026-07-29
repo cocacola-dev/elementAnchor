@@ -96,6 +96,8 @@
       flex-wrap: wrap;
       align-items: center;
     }
+    /* Pushes output actions (Copy/Export) to the right, away from capture. */
+    .toolbar-spacer { flex: 1 1 auto; min-width: 8px; }
 
     button {
       font-family: inherit;
@@ -133,6 +135,37 @@
       gap: 6px;
       margin-bottom: 12px;
       flex-wrap: wrap;
+      align-items: center;
+    }
+    .options-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-right: 2px;
+    }
+
+    /* ---------- Inline hint (e.g. cross-origin stylesheets) ---------- */
+    .hint {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+      padding: 6px 10px;
+      font-size: 10px;
+      line-height: 1.4;
+      color: var(--html);
+      background: color-mix(in srgb, var(--html) 12%, var(--surface));
+      border: 1px solid color-mix(in srgb, var(--html) 30%, var(--border));
+      border-radius: 6px;
+    }
+    .hint-text { flex: 1 1 180px; }
+    .hint .mini-btn {
+      flex: none;
+      color: var(--text);
+      border-color: color-mix(in srgb, var(--html) 40%, var(--border));
     }
     .chip {
       display: inline-flex;
@@ -288,6 +321,17 @@
       padding: 10px;
       pointer-events: none;
     }
+    .preview-note {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      font-size: 10px;
+      line-height: 1.4;
+      color: var(--html);
+      background: color-mix(in srgb, var(--html) 12%, var(--surface));
+      border-top: 1px solid var(--border);
+    }
     /* A checkbox chip small enough to sit inside a section header. */
     .chip.mini { padding: 2px 8px; font-size: 10px; }
     /* Compact icon button for the preview background switch. */
@@ -358,18 +402,26 @@
   <div class="toolbar">
     <button id="btn-capture" class="primary">&#x2693; Capture</button>
     <button id="btn-pin" class="toggle">&#x1F4CC; Pin</button>
+    <span class="toolbar-spacer"></span>
     <button id="btn-copy-all">Copy All</button>
     <button id="btn-export">Export .html</button>
   </div>
 
   <div class="options">
+    <span class="options-label">Capture</span>
     <label class="chip"><input type="checkbox" id="opt-children" checked> Children</label>
     <label class="chip"><input type="checkbox" id="opt-pseudo" checked> Pseudo</label>
     <label class="chip"><input type="checkbox" id="opt-iframes" checked> Iframes</label>
-    <label class="chip"><input type="checkbox" id="opt-computed"> Computed only</label>
+    <label class="chip"><input type="checkbox" id="opt-computed" checked> Computed only</label>
   </div>
 
   <div id="element-info">Select an element to drop anchor</div>
+
+  <div class="hint" id="xorigin-hint" style="display:none;">
+    <span class="hint-text">&#x26A0;&#xFE0F; Some stylesheets are cross-origin and couldn&rsquo;t be read, so styles may be missing.</span>
+    <button id="btn-enable-computed" class="mini-btn">Use Computed only</button>
+  </div>
+
   <div id="status" class="status"></div>
 
   <div class="section" data-lang="preview">
@@ -380,7 +432,7 @@
           <button id="btn-replay" class="mini-btn" title="Restart the animation">&#x21BB; Replay</button>
           <label class="chip mini" title="Force animations to repeat forever"><input type="checkbox" id="opt-loop"> Loop</label>
         </span>
-        <button id="btn-bg" class="mini-btn" title="Preview background: checker">&#x25A6;</button>
+        <button id="btn-bg" class="mini-btn" title="Preview background: checker">&#x25D0;</button>
         <label class="chip mini" title="Execute captured scripts and inline handlers inside the preview"><input type="checkbox" id="opt-runjs"> Run JS</label>
       </div>
     </div>
@@ -388,6 +440,9 @@
       <div class="preview-stage" id="preview-stage" data-bg="checker">
         <iframe id="preview-frame" title="Rendered preview of the captured element" sandbox referrerpolicy="no-referrer"></iframe>
         <div class="preview-empty" id="preview-empty">Capture an element to see it rendered here.</div>
+      </div>
+      <div class="preview-note" id="preview-note" style="display:none;">
+        &#x26A0;&#xFE0F; This preview contains links &mdash; clicking them navigates inside the sandbox and may trigger a redirect. Avoid clicking.
       </div>
     </div>
   </div>
@@ -399,7 +454,7 @@
         <button data-copy="html-body">Copy</button>
       </div>
     </div>
-    <div class="section-body" id="html-body"><pre id="html-code"></pre></div>
+    <div class="section-body collapsed" id="html-body"><pre id="html-code"></pre></div>
   </div>
 
   <div class="section" data-lang="css">
@@ -409,7 +464,7 @@
         <button data-copy="css-body">Copy</button>
       </div>
     </div>
-    <div class="section-body" id="css-body"><pre id="css-code"></pre></div>
+    <div class="section-body collapsed" id="css-body"><pre id="css-code"></pre></div>
   </div>
 
   <div class="section" data-lang="js">
@@ -419,7 +474,7 @@
         <button data-copy="js-body">Copy</button>
       </div>
     </div>
-    <div class="section-body" id="js-body"><pre id="js-code"></pre></div>
+    <div class="section-body collapsed" id="js-body"><pre id="js-code"></pre></div>
   </div>
 
   <script src="panel.js"></script>
