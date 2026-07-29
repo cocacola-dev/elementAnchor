@@ -81,6 +81,128 @@ function extractElement(options) {
     return rules;
   }
 
+  // Walk every rule in the document, descending into grouping rules
+  // (@media, @supports, @layer, @container) but not into style rules.
+  function eachRule(doc, cb) {
+    doc = doc || document;
+    const view = doc.defaultView || window;
+    const StyleRule = view.CSSStyleRule || CSSStyleRule;
+    function walk(rules) {
+      for (const rule of rules) {
+        cb(rule);
+        if (rule.cssRules && !(rule instanceof StyleRule)) {
+          try { walk(rule.cssRules); } catch (_) {}
+        }
+      }
+    }
+    for (const sheet of doc.styleSheets) {
+      try {
+        const rules = sheet.cssRules || sheet.rules;
+        if (rules) walk(rules);
+      } catch (_) {}
+    }
+  }
+
+  // The element's matched/computed rules only carry declarations that live on
+  // the element and its descendants. Two things a faithful preview also needs
+  // live elsewhere: CSS custom properties (design tokens defined on :root or an
+  // ancestor) and @font-face rules (at-rules, never matched to an element).
+  // Without these, var() references collapse and custom fonts fall back.
+  function collectContextCSS(element, doc) {
+    doc = doc || document;
+    const view = doc.defaultView || window;
+    const FontFaceRule = view.CSSFontFaceRule || CSSFontFaceRule;
+    const cssText = collectedCSS.join("\n");
+    const blocks = [];
+
+    // --- Custom properties referenced via var(), resolved from the element's
+    // computed style so inheritance from :root/ancestors is handled for free.
+    const computed = view.getComputedStyle(element);
+    const chosen = new Map();
+    const queue = [];
+    const varRe = /var\(\s*(--[A-Za-z0-9_-]+)/g;
+    let m;
+    while ((m = varRe.exec(cssText))) queue.push(m[1]);
+    while (queue.length) {
+      const name = queue.shift();
+      if (chosen.has(name)) continue;
+      const val = computed.getPropertyValue(name).trim();
+      if (!val) continue;
+      chosen.set(name, val);
+      // If the browser left nested references unresolved, chase them too.
+      let mm;
+      const nested = /var\(\s*(--[A-Za-z0-9_-]+)/g;
+      while ((mm = nested.exec(val))) queue.push(mm[1]);
+    }
+    if (chosen.size) {
+      const lines = [];
+      for (const [k, v] of chosen) lines.push("  " + k + ": " + v + ";");
+      blocks.push(":root {\n" + lines.join("\n") + "\n}");
+    }
+
+    // --- @font-face rules for families the element (or its captured rules)
+    // actually use, so custom/icon fonts render instead of falling back.
+    const families = new Set();
+    function addFamilies(str) {
+      if (!str) return;
+      str.split(",").forEach((f) => {
+        const name = f.trim().replace(/^["']|["']$/g, "").toLowerCase();
+        if (name) families.add(name);
+      });
+    }
+    let fm;
+    const famRe = /font-family:\s*([^;}]+)/gi;
+    while ((fm = famRe.exec(cssText))) addFamilies(fm[1]);
+    addFamilies(computed.fontFamily);
+    for (const pseudo of ["::before", "::after"]) {
+      addFamilies(view.getComputedStyle(element, pseudo).fontFamily);
+    }
+    eachRule(doc, (rule) => {
+      if (rule instanceof FontFaceRule) {
+        const fam = (rule.style.getPropertyValue("font-family") || "")
+          .trim().replace(/^["']|["']$/g, "").toLowerCase();
+        if (families.has(fam)) blocks.push(rule.cssText);
+      }
+    });
+
+    // --- @keyframes for animations the element (and, if captured, its
+    // descendants) actually run. Like @font-face, these at-rules are never
+    // matched to an element, so without this the animation has no timeline
+    // to play and nothing moves in the preview.
+    const KeyframesRule = view.CSSKeyframesRule || CSSKeyframesRule;
+    const animNames = new Set();
+    function addAnim(str) {
+      if (!str || str === "none") return;
+      str.split(",").forEach((n) => {
+        const name = n.trim();
+        if (name && name !== "none") animNames.add(name);
+      });
+    }
+    addAnim(computed.animationName);
+    for (const pseudo of ["::before", "::after"]) {
+      addAnim(view.getComputedStyle(element, pseudo).animationName);
+    }
+    if (opts.children) {
+      let count = 0;
+      for (const d of element.querySelectorAll("*")) {
+        if (++count > 500) break; // guard against huge subtrees
+        addAnim(view.getComputedStyle(d).animationName);
+      }
+    }
+    let an;
+    const anRe = /animation-name:\s*([^;}]+)/gi;
+    while ((an = anRe.exec(cssText))) addAnim(an[1]);
+    if (animNames.size) {
+      eachRule(doc, (rule) => {
+        if (rule instanceof KeyframesRule && animNames.has(rule.name)) {
+          blocks.push(rule.cssText);
+        }
+      });
+    }
+
+    return blocks.join("\n\n");
+  }
+
   function getComputedCSS(element, selector) {
     const computed = window.getComputedStyle(element);
     const lines = [];
@@ -219,6 +341,14 @@ function extractElement(options) {
 
   processElement(el);
 
+  // Prepend inherited design tokens + @font-face rules so the collected CSS is
+  // self-contained: it now renders correctly on its own (preview, export, or
+  // pasted elsewhere) instead of silently losing var() values and fonts.
+  const context = collectContextCSS(el, el.ownerDocument || document);
+  if (context) {
+    collectedCSS.unshift("/* --- inherited variables, @font-face & @keyframes --- */\n" + context);
+  }
+
   const tag = el.localName;
   const id = el.id ? "#" + el.id : "";
   const cls = el.className && typeof el.className === "string"
@@ -230,5 +360,8 @@ function extractElement(options) {
     html: opts.children ? el.outerHTML : el.cloneNode(false).outerHTML,
     css: collectedCSS.join("\n\n"),
     js: collectedJS.join("\n\n"),
+    // Absolute base of the element's document so relative asset URLs
+    // (images, fonts, backgrounds) resolve when rendered in the preview iframe.
+    baseURI: (el.ownerDocument || document).baseURI,
   };
 }

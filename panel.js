@@ -13,6 +13,15 @@
     }
   } catch (_) {}
 
+  const previewFrame = document.getElementById("preview-frame");
+  const previewStage = document.getElementById("preview-stage");
+  const previewEmpty = document.getElementById("preview-empty");
+  const optRunJS = document.getElementById("opt-runjs");
+  const btnBg = document.getElementById("btn-bg");
+  const animControls = document.getElementById("anim-controls");
+  const btnReplay = document.getElementById("btn-replay");
+  const optLoop = document.getElementById("opt-loop");
+
   const htmlCode = document.getElementById("html-code");
   const cssCode = document.getElementById("css-code");
   const jsCode = document.getElementById("js-code");
@@ -117,6 +126,56 @@
     return null;
   }
 
+  function escapeAttr(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;");
+  }
+
+  // Stop captured CSS/JS from prematurely closing the <style>/<script> wrapper.
+  // The HTML parser ends a raw-text element only on a literal "</style" /
+  // "</script"; splitting that sequence keeps the content inside. The stray
+  // backslash is inert in both CSS and — where it only ever appears inside a
+  // string like `"</script>"` — JS.
+  function guardRawText(str) {
+    return String(str).replace(/<\/(style|script)/gi, "<\\/$1");
+  }
+
+  // Render the captured element into the sandboxed preview iframe. The iframe
+  // is a unique opaque origin: with no `allow-scripts` token nothing executes,
+  // so the static HTML+CSS replica can't touch the page or the panel. Toggling
+  // "Run JS" adds `allow-scripts` and injects the captured scripts/handlers.
+  function renderPreview(result) {
+    if (!result) {
+      previewFrame.removeAttribute("srcdoc");
+      previewFrame.style.display = "none";
+      previewEmpty.style.display = "";
+      return;
+    }
+    previewEmpty.style.display = "none";
+    previewFrame.style.display = "";
+    const runJS = optRunJS.checked;
+    // Force every finite animation to repeat. Injected after the captured CSS
+    // so !important wins regardless of what the element declares.
+    const loopCSS = optLoop.checked
+      ? "\n*,*::before,*::after{animation-iteration-count:infinite!important;}"
+      : "";
+    const base = result.baseURI
+      ? '<base href="' + escapeAttr(result.baseURI) + '">'
+      : "";
+    const doc =
+      "<!DOCTYPE html><html><head><meta charset=\"utf-8\">" + base +
+      "<style>html,body{margin:0;padding:0;}\n" + guardRawText(result.css || "") + loopCSS + "</style>" +
+      "</head><body>" +
+      result.html +
+      (runJS && result.js ? "<script>\n" + guardRawText(result.js) + "\n<\/script>" : "") +
+      "</body></html>";
+    // Set sandbox before srcdoc so the new document loads under the right policy.
+    previewFrame.setAttribute("sandbox", runJS ? "allow-scripts" : "");
+    previewFrame.srcdoc = doc;
+  }
+
   function displayResult(result) {
     lastResult = result;
     elementInfo.textContent = result.info + (result.frameURL ? "  [iframe]" : "");
@@ -133,6 +192,13 @@
 
     jsCode.textContent = result.js || "No scripts found";
     jsSize.textContent = formatBytes(byteLength(result.js || ""));
+
+    // Only surface Replay/Loop when the capture actually has a keyframe
+    // animation — the extractor only emits @keyframes when one is in use.
+    const hasAnimation = /@keyframes/i.test(result.css || "");
+    animControls.style.display = hasAnimation ? "inline-flex" : "none";
+
+    renderPreview(result);
 
     setStatus("Captured successfully" + (result.frameURL ? " (from iframe)" : ""), true);
   }
@@ -192,6 +258,28 @@
     });
 
   btnCapture.addEventListener("click", capture);
+
+  // Re-render the existing capture when JS execution is toggled — no re-capture
+  // needed since we already hold the HTML/CSS/JS.
+  optRunJS.addEventListener("change", () => renderPreview(lastResult));
+
+  // Replay re-renders the iframe from scratch — a fresh document restarts every
+  // load-driven CSS animation, which is the only way to retrigger them without
+  // reaching into the sandboxed frame's DOM.
+  btnReplay.addEventListener("click", () => renderPreview(lastResult));
+
+  // Toggling Loop re-renders so the infinite-iteration override is applied (or
+  // removed) and the animation restarts under the new setting.
+  optLoop.addEventListener("change", () => renderPreview(lastResult));
+
+  // Cycle the preview backdrop so light-on-light / dark-on-dark elements stay
+  // visible. Pure CSS via data-bg — no re-render needed.
+  const BG_MODES = ["checker", "light", "dark"];
+  btnBg.addEventListener("click", () => {
+    const next = BG_MODES[(BG_MODES.indexOf(previewStage.dataset.bg) + 1) % BG_MODES.length];
+    previewStage.dataset.bg = next;
+    btnBg.title = "Preview background: " + next;
+  });
 
   // Pin freezes the current capture so navigating the Elements tree doesn't
   // overwrite what you're looking at. The Capture button still forces a refresh.
@@ -259,10 +347,10 @@
       return;
     }
     const doc = "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Exported Element</title>\n<style>\n" +
-      (lastResult.css || "/* No styles */") +
+      guardRawText(lastResult.css || "/* No styles */") +
       "\n</style>\n</head>\n<body>\n" +
       lastResult.html +
-      (lastResult.js ? "\n<script>\n" + lastResult.js + "\n<\/script>" : "") +
+      (lastResult.js ? "\n<script>\n" + guardRawText(lastResult.js) + "\n<\/script>" : "") +
       "\n</body>\n</html>";
 
     const blob = new Blob([doc], { type: "text/html" });
