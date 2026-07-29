@@ -22,7 +22,7 @@ Select an element in the **Elements** panel and Element Anchor captures a clean,
 
 ## Usage
 
-![Using Element Anchor](docs/usage.jpg)
+![Using Element Anchor](docs/usage29jul.jpg)
 
 1. Open **DevTools** (`F12` or `Ctrl+Shift+I`) on any page.
 2. Go to the **Elements** tab and click the element you want to capture.
