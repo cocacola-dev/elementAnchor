@@ -245,6 +245,57 @@
     .section[data-lang="html"] .lang-dot { background: var(--html); box-shadow: 0 0 6px var(--html); }
     .section[data-lang="css"]  .lang-dot { background: var(--css);  box-shadow: 0 0 6px var(--css); }
     .section[data-lang="js"]   .lang-dot { background: var(--js);   box-shadow: 0 0 6px var(--js); }
+    .section[data-lang="preview"] .lang-dot { background: var(--accent-2); box-shadow: 0 0 6px var(--accent-glow); }
+
+    /* ---------- Live preview ---------- */
+    .preview-stage {
+      /* Resizable + scrollable since a sandboxed iframe can't report its own
+         content height back to the panel. Background is switchable so light
+         elements stay visible on a dark stage and vice versa. */
+      position: relative;
+      height: 220px;
+      min-height: 90px;
+      resize: vertical;
+      overflow: auto;
+      padding: 12px;
+      background: #ffffff;
+    }
+    .preview-stage[data-bg="checker"] {
+      background-color: #ffffff;
+      background-image:
+        linear-gradient(45deg, #eceff3 25%, transparent 25%, transparent 75%, #eceff3 75%),
+        linear-gradient(45deg, #eceff3 25%, transparent 25%, transparent 75%, #eceff3 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 8px 8px;
+    }
+    .preview-stage[data-bg="light"] { background: #ffffff; }
+    .preview-stage[data-bg="dark"]  { background: #1e1e1e; }
+    #preview-frame {
+      width: 100%;
+      min-height: calc(100% - 24px);
+      border: 0;
+      background: transparent;
+    }
+    .preview-empty {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #8695a9;
+      font-size: 11px;
+      text-align: center;
+      padding: 10px;
+      pointer-events: none;
+    }
+    /* A checkbox chip small enough to sit inside a section header. */
+    .chip.mini { padding: 2px 8px; font-size: 10px; }
+    /* Compact icon button for the preview background switch. */
+    .mini-btn {
+      padding: 2px 7px;
+      font-size: 11px;
+      line-height: 1.3;
+    }
 
     .tag {
       font-family: "Cascadia Code", "Consolas", monospace;
@@ -320,6 +371,26 @@
 
   <div id="element-info">Select an element to drop anchor</div>
   <div id="status" class="status"></div>
+
+  <div class="section" data-lang="preview">
+    <div class="section-header" data-target="preview-body">
+      <span class="section-title"><span class="chevron"></span><span class="lang-dot"></span>Preview</span>
+      <div class="section-actions">
+        <span id="anim-controls" style="display:none; gap:4px;">
+          <button id="btn-replay" class="mini-btn" title="Restart the animation">&#x21BB; Replay</button>
+          <label class="chip mini" title="Force animations to repeat forever"><input type="checkbox" id="opt-loop"> Loop</label>
+        </span>
+        <button id="btn-bg" class="mini-btn" title="Preview background: checker">&#x25A6;</button>
+        <label class="chip mini" title="Execute captured scripts and inline handlers inside the preview"><input type="checkbox" id="opt-runjs"> Run JS</label>
+      </div>
+    </div>
+    <div class="section-body" id="preview-body">
+      <div class="preview-stage" id="preview-stage" data-bg="checker">
+        <iframe id="preview-frame" title="Rendered preview of the captured element" sandbox referrerpolicy="no-referrer"></iframe>
+        <div class="preview-empty" id="preview-empty">Capture an element to see it rendered here.</div>
+      </div>
+    </div>
+  </div>
 
   <div class="section" data-lang="html">
     <div class="section-header" data-target="html-body">
